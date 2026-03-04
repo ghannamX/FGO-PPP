@@ -1,4 +1,5 @@
  ### Bismillah 
+ *"And He it is Who made the stars for you that you might follow the right direction thereby in the darkness of the land and the sea."* — Quran 6:97
 # FGO-PPP — Factor Graph Optimization for Precise Point Positioning
 
 A high-accuracy GNSS positioning engine implementing **Precise Point Positioning (PPP)** and **PPP-RTK** through **Factor Graph Optimization (FGO)**, with optional tight-coupling to inertial and other sensors.
@@ -55,7 +56,7 @@ A high-accuracy GNSS positioning engine implementing **Precise Point Positioning
 
 ## Module Breakdown
 
-### 1. `gnss/io` — Data Ingestion & Parsers
+### 1. `gnss/input` — Data Ingestion & Parsers
 
 Responsible for reading all standard GNSS data formats.
 
@@ -262,7 +263,7 @@ FGO-PPP/
 │
 ├── src/
 │   ├── gnss/
-│   │   ├── io/            # Parsers (RINEX, SP3, ANTEX, IONEX, DCB, SSR)
+│   │   ├── input/         # Parsers (RINEX, SP3, ANTEX, IONEX, DCB, SSR)
 │   │   ├── time/          # Time systems & coordinate frames
 │   │   ├── satellite/     # Orbit & clock computation
 │   │   ├── corrections/   # Atmospheric, hardware, geometric corrections
@@ -277,14 +278,14 @@ FGO-PPP/
 │   │   ├── graph/         # Factor graph builder & optimizer wrapper
 │   │   └── smoother/      # Sliding-window / iSAM2 interface
 │   │
-│   ├── sensor_fusion/
+│   ├── sensorFusion/
 │   │   ├── imu/           # Pre-integration, bias model
 │   │   └── fusion/        # Multi-sensor graph assembly
 │   │
 │   └── apps/
-│       ├── ppp_solver/    # PPP/PPP-AR post-processing app
-│       ├── rtk_solver/    # RTK processing app
-│       └── rt_receiver/   # Real-time receiver pipeline
+│       ├── pppSolver/     # PPP/PPP-AR post-processing app
+│       ├── rtkSolver/     # RTK processing app
+│       └── rtReceiver/    # Real-time receiver pipeline
 │
 ├── include/               # Public headers (mirrors src structure)
 ├── tests/                 # Google Test unit & integration tests
@@ -355,4 +356,4 @@ FGO-PPP/
 
 ---
 
-*"And He it is Who made the stars for you that you might follow the right direction thereby in the darkness of the land and the sea."* — Quran 6:97
+
