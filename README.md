@@ -1,4 +1,5 @@
-Bismillah
+بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ
+
  *"And He it is Who made the stars for you that you might follow the right direction thereby in the darkness of the land and the sea."* — Quran 6:97
 # FGO-PPP — Factor Graph Optimization for Precise Point Positioning
 
@@ -44,42 +45,26 @@ A high-accuracy GNSS positioning engine implementing **Precise Point Positioning
   - `ObsMeasurement` — value + LLI + signal strength per observation slot
   - `Constellation` — GPS, GLONASS, Galileo, BeiDou, QZSS, SBAS, NavIC
 - **Time types** (`include/time/`):
-  - `GnssTime` — epoch struct with full validation (year >= 1980, leap second support)
+  - `DateTime` — calendar epoch struct with full validation
 - **RINEX 3 observation parser** (`include/input/rinex/`, `src/gnss/input/rinex/`):
-  - `RinexObsParser` — stateless parser for RINEX 3.03/3.04 observation files
-  - Full header parsing: all standard records including `SYS / # / OBS TYPES` with continuation lines
-  - Epoch parsing: `>` marker line with column-exact field extraction per RINEX 3 spec
-  - Satellite data line parsing: N x 16-char observation blocks (14-char value + LLI + SNR)
-  - Constellation filtering, malformed-line tolerance, pre-allocation hints
-  - `ParseResult<T>` — discriminated union (variant) for error handling without exceptions
-  - Slot-indexed observation storage: O(1) access by column position, no nested maps
-  - Tested with real multi-constellation RINEX 3.04 MIXED files (GPS/GLONASS/Galileo/BeiDou)
-- **Example app** (`src/apps/rinex_reader/`):
-  - Takes a RINEX 3 `.obs` file path and prints header, observation types, epoch summary, first-epoch detail
+  - Stateless parser for RINEX 3.03/3.04 observation files
+  - Full header + epoch parsing, slot-indexed O(1) observation storage
+  - Tested: TLSE RINEX 3.04 MIXED — 2880 epochs, 141 134 observations
 - **RINEX 3 navigation parser** (`include/input/rinex/`, `src/gnss/input/rinex/`):
-  - `RinexNavParser` — stateless parser for RINEX 3.03/3.04 GPS navigation files
-  - GPS broadcast ephemeris: all 28 Keplerian orbital + clock + metadata fields
-  - Klobuchar ionospheric model coefficients (GPSA/GPSB) from IONOSPHERIC CORR header records
-  - Fortran D19.12 double-precision field parsing (D/d exponent notation)
-  - Non-GPS constellation records skipped with correct orbit line counts (3 for GLO/SBAS, 7 for GPS/GAL/BDS/QZSS/NavIC)
-  - Constellation filtering, malformed-record tolerance, pre-allocation hints
-  - Tested with TLSE (Toulouse) RINEX 3.04 GPS nav file: 211 ephemeris records parsed
-- **Shared parse result types** (`include/input/rinex/rinexParseResult.hpp`):
-  - `ParseResult<T>`, `ParseError`, `ParseErrorCode` shared between obs and nav parsers
-- **Example app** (`src/apps/nav_reader/`):
-  - Takes a RINEX 3 `.nav`/`.rnx` file path and prints header, Klobuchar coefficients, ephemeris table
+  - Stateless parser for RINEX 3.03/3.04 GPS navigation files
+  - All 28 Keplerian + clock + metadata fields, Klobuchar iono coefficients
+  - Tested: TLSE RINEX 3.04 GPS nav — 211 ephemeris records
+- **Broadcast orbit & clock** (`include/satellite/`, `src/gnss/satellite/`):
+  - `BroadcastOrbitComputer` — Keplerian propagation to ECEF + relativistic correction
+  - `SatelliteClockCorrector` — af0/af1/af2 polynomial + relativistic correction
+  - `EphemerisSelector` — selects closest ephemeris to a given epoch
+  - `SagnacCorrection` — Earth rotation correction for signal travel time
+  - Tested: TLSE first epoch, 13 GPS satellites — positions + clock corrections verified
 
-### Next Steps — Road to First SPP Fix
+### Next
 
-1. **Satellite orbit computation** — Keplerian propagation from broadcast ephemeris to ECEF position at transmission time
-2. **Satellite clock correction** — af0/af1/af2 polynomial + relativistic correction + TGD
-3. **Coordinate frame transforms** — ECEF / LLA / ENU conversions
-4. **Tropospheric correction** — Saastamoinen zenith delay + elevation mapping function
-5. **Ionospheric correction** — Klobuchar model (single-frequency) or iono-free L1/L2 combination (dual-frequency)
-6. **Earth rotation correction** — Sagnac effect during signal travel time
-7. **Elevation/azimuth computation** — ECEF to local ENU, elevation mask
-8. **SPP observation model** — pseudorange equation linearised around approximate position
-9. **Weighted Least Squares solver** — iterate design matrix H, weight by elevation, converge to ECEF + receiver clock
+See [roadmap/spp-sprint.md](roadmap/spp-sprint.md) for the active sprint to first SPP fix.
+See [roadmap/phases.md](roadmap/phases.md) for the full project roadmap.
 
 ---
 
@@ -115,92 +100,40 @@ FGO-PPP/
 │
 ├── include/
 │   ├── common/            # SatId, ObsCode, ObsMeasurement, Constellation
-│   ├── time/              # GnssTime
-│   ├── geodesy/           # CoordFrame (ECEF/ENU/LLA transforms)
+│   ├── time/              # DateTime
+│   ├── geodesy/           # CoordTransforms (ECEF/ENU/LLA)
+│   ├── satellite/         # BroadcastOrbitComputer, EphemerisSelector, ...
+│   ├── corrections/       # TroposphericModel, KlobucharModel (planned)
+│   ├── solution/          # SppSolver (planned)
 │   └── input/
-│       └── rinex/         # rinexObsTypes, RinexObsParser, RinexNavParser, rinexParseResult
+│       └── rinex/         # rinexObsTypes, rinexNavTypes, parsers, ParseResult
 │
 ├── src/
-│   ├── gnss/
-│   │   ├── input/         # Parser implementations
-│   │   │   └── rinex/     # RinexObsParser.cpp, RinexNavParser.cpp
-│   │   ├── time/          # GnssTime.cpp, CoordFrame.cpp
-│   │   ├── satellite/     # Orbit & clock computation (planned)
-│   │   ├── corrections/   # Atmospheric, hardware corrections (planned)
-│   │   ├── preprocessing/ # Cycle slip, outlier, smoothing (planned)
-│   │   ├── observation/   # Measurement models (planned)
-│   │   ├── ambiguity/     # Float estimation & integer fixing (planned)
-│   │   └── solution/      # Output, quality indicators (planned)
-│   │
-│   ├── fgo/               # Factor graph engine (planned)
-│   ├── sensor_fusion/     # IMU pre-integration (planned)
-│   │
-│   └── apps/
-│       ├── rinex_reader/  # RINEX 3 observation file reader
-│       └── nav_reader/    # RINEX 3 navigation file reader
+│   └── gnss/
+│       ├── input/rinex/   # RinexObsParser.cpp, RinexNavParser.cpp
+│       ├── time/          # GnssTime.cpp
+│       ├── satellite/     # BroadcastOrbitComputer, EphemerisSelector, ...
+│       ├── geodesy/       # CoordTransforms.cpp (planned)
+│       ├── corrections/   # TroposphericModel, KlobucharModel (planned)
+│       └── solution/      # SppSolver.cpp (planned)
 │
+├── apps/
+│   ├── rinex_reader/      # RINEX 3 observation file reader
+│   ├── nav_reader/        # RINEX 3 navigation file reader
+│   ├── satellite_position/# ECEF position + clock correction per epoch
+│   └── spp/               # SPP weighted least squares (planned)
+│
+├── roadmap/
+│   ├── phases.md          # Full phase 1–6 roadmap
+│   └── spp-sprint.md      # Active sprint: first SPP fix
+│
+├── docs/                  # Algorithm documentation with equations
 ├── tests/                 # Google Test unit & integration tests
-├── data/
-│   └── rinex/
-│       ├── obs/           # RINEX 3 observation files (.rnx, .obs)
-│       └── nav/           # RINEX 3 navigation files (.rnx, .nav)
-└── docs/                  # Algorithm documentation
+└── data/
+    └── rinex/
+        ├── obs/           # RINEX 3 observation files
+        └── nav/           # RINEX 3 navigation files
 ```
-
----
-
-## Implementation Roadmap
-
-### Phase 1 — Foundation
-- [x] CMake + Conan 2 project scaffold
-- [x] Common GNSS types (SatId, ObsCode, ObsMeasurement)
-- [x] GnssTime with epoch validation
-- [x] RINEX 3 observation parser (3.03/3.04, multi-constellation)
-- [x] RINEX 3 navigation parser (GPS broadcast ephemeris, Klobuchar iono)
-- [x] Shared `ParseResult<T>` error handling (rinexParseResult.hpp)
-- [ ] SP3 precise orbit parser
-- [ ] Time system utilities (GPST/UTC/GST/BDT conversions)
-- [ ] Coordinate frame transforms (ECEF / LLA / ENU)
-
-### Phase 2 — SPP Baseline
-- [ ] Broadcast orbit propagation (Keplerian elements to ECEF)
-- [ ] Satellite clock correction (polynomial + relativistic + TGD)
-- [ ] Transmission time iteration
-- [ ] Earth rotation correction (Sagnac)
-- [ ] Saastamoinen tropospheric model
-- [ ] Klobuchar ionospheric model
-- [ ] Elevation / azimuth computation
-- [ ] SPP weighted least squares solver
-- [ ] Basic outlier rejection
-
-### Phase 3 — PPP Float
-- [ ] SP3 + RINEX clock precise products
-- [ ] ANTEX PCO/PCV corrections
-- [ ] Phase wind-up, solid Earth tide
-- [ ] Uncombined PPP observation model
-- [ ] Factor graph integration (GTSAM or Eigen-based)
-- [ ] ZTD + receiver clock as states
-- [ ] Float ambiguity states
-- [ ] Cycle slip detection (MW + GF)
-
-### Phase 4 — Ambiguity Resolution (PPP-AR)
-- [ ] FCB/UPD product parser
-- [ ] LAMBDA integer search engine
-- [ ] Wide-lane / narrow-lane cascaded fixing
-- [ ] Ratio test & partial fixing
-- [ ] PPP-AR validation against IGS reference stations
-
-### Phase 5 — RTK & PPP-RTK
-- [ ] Double-difference observation model
-- [ ] SSR decoder (RTCM 3 SSR messages)
-- [ ] Network augmentation (OSR / SSR phase biases)
-- [ ] PPP-RTK fast convergence
-
-### Phase 6 — Sensor Fusion
-- [ ] IMU pre-integration factor
-- [ ] GNSS/IMU tight-coupled FGO
-- [ ] Sliding-window smoother (iSAM2)
-- [ ] Real-time pipeline
 
 ---
 
@@ -214,11 +147,10 @@ conan install . --output-folder=build --build=missing
 cmake --preset conan-default
 cmake --build build/build --config Release
 
-# Run the RINEX observation reader
-./build/build/src/apps/Release/rinex_reader <path-to-rinex3-obs-file>
-
-# Run the RINEX navigation reader
-./build/build/src/apps/Release/nav_reader <path-to-rinex3-nav-file>
+# Run apps
+./build/build/src/apps/Release/rinex_reader      <obs-file>
+./build/build/src/apps/Release/nav_reader        <nav-file>
+./build/build/src/apps/Release/satellite_position <obs-file> <nav-file>
 ```
 
 ---
